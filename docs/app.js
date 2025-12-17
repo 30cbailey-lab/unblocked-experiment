@@ -185,6 +185,38 @@
   const raycaster = new THREE.Raycaster();
   const chunks = new Map();
   const blocks = new Map();
+
+  const NON_SOLID = new Set(['air','water','leaves']);
+
+  function isSolidBlockAt(ix, iy, iz){
+    const b = blocks.get(getBlockKey(ix, iy, iz));
+    return !!b && !NON_SOLID.has(b);
+  }
+
+  function aabbIntersects(x, y, z, halfWidth, height){
+    const minX = x - halfWidth;
+    const maxX = x + halfWidth;
+    const minY = y;
+    const maxY = y + height;
+    const minZ = z - halfWidth;
+    const maxZ = z + halfWidth;
+
+    const ix0 = Math.floor(minX);
+    const ix1 = Math.floor(maxX);
+    const iy0 = Math.floor(minY);
+    const iy1 = Math.floor(maxY - 0.001);
+    const iz0 = Math.floor(minZ);
+    const iz1 = Math.floor(maxZ);
+
+    for(let ix = ix0; ix <= ix1; ix++){
+      for(let iy = Math.max(0, iy0); iy <= Math.min(WORLD_HEIGHT-1, iy1); iy++){
+        for(let iz = iz0; iz <= iz1; iz++){
+          if(isSolidBlockAt(ix, iy, iz)) return true;
+        }
+      }
+    }
+    return false;
+  }
   
   function getBlockKey(x, y, z){
     return x + ',' + y + ',' + z;
@@ -487,14 +519,18 @@
     scene.background = dayColor.clone().lerp(nightColor, 1 - Math.max(0, sunY));
     scene.fog.color.copy(scene.background);
 
+    // movement as velocity, then AABB collision
     const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
     const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
-    
-    if(keys['w']) player.pos.addScaledVector(forward, player.speed);
-    if(keys['s']) player.pos.addScaledVector(forward, -player.speed);
-    if(keys['a']) player.pos.addScaledVector(right, -player.speed);
-    if(keys['d']) player.pos.addScaledVector(right, player.speed);
-    
+
+    // horizontal velocity
+    player.vel.x = 0;
+    player.vel.z = 0;
+    if(keys['w']) { player.vel.addScaledVector(forward, player.speed); }
+    if(keys['s']) { player.vel.addScaledVector(forward, -player.speed); }
+    if(keys['a']) { player.vel.addScaledVector(right, -player.speed); }
+    if(keys['d']) { player.vel.addScaledVector(right, player.speed); }
+
     // Hunger decay
     if(Math.random() < 0.001) {
       player.hunger = Math.max(0, player.hunger - 0.1);
@@ -502,28 +538,60 @@
         player.health = Math.max(0, player.health - 0.5);
       }
     }
-    
+
+    // apply gravity
     player.vel.y -= player.gravity;
-    player.pos.y += player.vel.y;
-    
-    // Better collision detection
-    const belowKey = getBlockKey(Math.floor(player.pos.x), Math.floor(player.pos.y - 0.1), Math.floor(player.pos.z));
-    if(blocks.has(belowKey) && player.vel.y <= 0){
-      player.pos.y = Math.floor(player.pos.y) + 1;
-      player.vel.y = 0;
-      player.isGrounded = true;
+
+    // Prepare AABB params
+    const halfWidth = 0.3;
+    const height = 1.8;
+
+    // X axis
+    const tryX = player.pos.x + player.vel.x;
+    if(!aabbIntersects(tryX, player.pos.y, player.pos.z, halfWidth, height)){
+      player.pos.x = tryX;
     } else {
-      player.isGrounded = false;
+      player.vel.x = 0;
     }
-    
-    // Prevent walking through blocks
-    for(let dx = -1; dx <= 1; dx++) {
-      for(let dz = -1; dz <= 1; dz++) {
-        const checkKey = getBlockKey(Math.floor(player.pos.x + dx * 0.3), Math.floor(player.pos.y), Math.floor(player.pos.z + dz * 0.3));
-        if(blocks.has(checkKey)) {
-          player.pos.x -= player.vel.x > 0 ? 0.1 : player.vel.x < 0 ? -0.1 : 0;
-          player.pos.z -= player.vel.z > 0 ? 0.1 : player.vel.z < 0 ? -0.1 : 0;
+
+    // Z axis
+    const tryZ = player.pos.z + player.vel.z;
+    if(!aabbIntersects(player.pos.x, player.pos.y, tryZ, halfWidth, height)){
+      player.pos.z = tryZ;
+    } else {
+      player.vel.z = 0;
+    }
+
+    // Y axis (vertical: handle ground and ceilings)
+    const tryY = player.pos.y + player.vel.y;
+    if(player.vel.y <= 0){
+      // falling - check if will hit ground
+      if(aabbIntersects(player.pos.x, tryY, player.pos.z, halfWidth, height)){
+        // snap to block top
+        const footY = Math.floor(player.pos.y - 0.01);
+        // find highest solid block under player
+        let landY = -Infinity;
+        for(let yy = footY; yy >= 0; yy--){
+          if(isSolidBlockAt(Math.floor(player.pos.x), yy, Math.floor(player.pos.z))){ landY = yy; break; }
         }
+        if(landY !== -Infinity){
+          player.pos.y = landY + 1;
+        } else {
+          player.pos.y = Math.max(player.pos.y, 0);
+        }
+        player.vel.y = 0;
+        player.isGrounded = true;
+      } else {
+        player.pos.y = tryY;
+        player.isGrounded = false;
+      }
+    } else {
+      // moving up - stop at ceiling
+      if(aabbIntersects(player.pos.x, tryY, player.pos.z, halfWidth, height)){
+        player.vel.y = 0;
+      } else {
+        player.pos.y = tryY;
+        player.isGrounded = false;
       }
     }
     
