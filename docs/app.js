@@ -1,4 +1,4 @@
-// 3D Minecraft-like game with Three.js - Enhanced with textures, trees, and better terrain
+// 3D Minecraft-like game with Three.js - Full Survival Mode
 (function(){
   const BLOCK_SIZE = 1;
   const CHUNK_SIZE = 16;
@@ -6,16 +6,25 @@
   
   const BLOCKS = {
     air: { color: 0x000000, name: 'Air' },
-    grass: { color: 0x2d5016, name: 'Grass' },
-    dirt: { color: 0x8B4513, name: 'Dirt' },
-    stone: { color: 0x808080, name: 'Stone' },
-    wood: { color: 0x654321, name: 'Wood' },
-    sand: { color: 0xf4d03f, name: 'Sand' },
-    water: { color: 0x4287f5, name: 'Water' },
-    leaves: { color: 0x228B22, name: 'Leaves' },
+    grass: { color: 0x5eba1a, name: 'Grass', hardness: 0.6 },
+    dirt: { color: 0x8B6F47, name: 'Dirt', hardness: 0.5 },
+    stone: { color: 0x707070, name: 'Stone', hardness: 1.5 },
+    wood: { color: 0x8B5A2B, name: 'Wood', hardness: 2 },
+    sand: { color: 0xDEB887, name: 'Sand', hardness: 0.5 },
+    water: { color: 0x1E90FF, name: 'Water', hardness: -1 },
+    leaves: { color: 0x2D8A2D, name: 'Leaves', hardness: 0.2 },
+    coal: { color: 0x1a1a1a, name: 'Coal Ore', hardness: 3 },
+    iron: { color: 0xc0c0c0, name: 'Iron Ore', hardness: 3 },
   };
   
-  // Simple 2D Perlin-like noise function
+  // Crafting recipes
+  const RECIPES = {
+    'wood->planks': { input: { wood: 1 }, output: { planks: 4 } },
+    'planks->sticks': { input: { planks: 2 }, output: { sticks: 4 } },
+    'planks->crafting': { input: { planks: 4 }, output: { crafting_table: 1 } },
+    'sticks->torches': { input: { sticks: 1, coal: 1 }, output: { torches: 4 } },
+  };
+  
   function noise(x, z) {
     const n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
     return n - Math.floor(n);
@@ -41,25 +50,19 @@
     return ix0 + v * (ix1 - ix0);
   }
   
-  // Create canvas-based texture (improved Minecraft-style)
   function createTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
     
-    // Grass block (top + side)
+    // Grass
     ctx.fillStyle = '#5eba1a';
     ctx.fillRect(0, 0, 64, 32);
     ctx.fillStyle = '#3d7b13';
     ctx.fillRect(0, 32, 64, 32);
-    // Grass detail
-    for(let i = 0; i < 16; i++) {
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      ctx.fillRect(Math.random() * 64, Math.random() * 32, 2, 2);
-    }
     
-    // Dirt block
+    // Dirt
     ctx.fillStyle = '#8B6F47';
     ctx.fillRect(64, 0, 64, 64);
     for(let i = 0; i < 30; i++) {
@@ -67,24 +70,15 @@
       ctx.fillRect(64 + Math.random() * 64, Math.random() * 64, 3, 3);
     }
     
-    // Stone block (rocky texture)
+    // Stone
     ctx.fillStyle = '#707070';
     ctx.fillRect(128, 0, 64, 64);
     for(let i = 0; i < 40; i++) {
       ctx.fillStyle = i % 2 === 0 ? '#505050' : '#909090';
       ctx.fillRect(128 + Math.random() * 64, Math.random() * 64, 2, 2);
     }
-    // Cracks
-    ctx.strokeStyle = '#404040';
-    ctx.lineWidth = 1;
-    for(let i = 0; i < 8; i++) {
-      ctx.beginPath();
-      ctx.moveTo(128 + Math.random() * 64, Math.random() * 64);
-      ctx.lineTo(128 + Math.random() * 64, Math.random() * 64);
-      ctx.stroke();
-    }
     
-    // Wood block (log rings)
+    // Wood
     ctx.fillStyle = '#8B5A2B';
     ctx.fillRect(192, 0, 64, 64);
     ctx.strokeStyle = '#654321';
@@ -95,7 +89,7 @@
       ctx.stroke();
     }
     
-    // Sand block (grain texture)
+    // Sand
     ctx.fillStyle = '#DEB887';
     ctx.fillRect(0, 64, 64, 64);
     for(let i = 0; i < 50; i++) {
@@ -103,7 +97,7 @@
       ctx.fillRect(Math.random() * 64, 64 + Math.random() * 64, 2, 2);
     }
     
-    // Water block (wavy pattern)
+    // Water
     ctx.fillStyle = '#1E90FF';
     ctx.fillRect(64, 64, 64, 64);
     ctx.strokeStyle = '#4169E1';
@@ -117,12 +111,20 @@
       ctx.stroke();
     }
     
-    // Leaves block (dense green with variation)
+    // Leaves
     ctx.fillStyle = '#2D8A2D';
     ctx.fillRect(128, 64, 64, 64);
     for(let i = 0; i < 60; i++) {
       ctx.fillStyle = i % 3 === 0 ? '#228B22' : '#3CB371';
       ctx.fillRect(128 + Math.random() * 64, 64 + Math.random() * 64, 3, 3);
+    }
+    
+    // Coal (dark gray)
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(192, 64, 64, 64);
+    for(let i = 0; i < 50; i++) {
+      ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+      ctx.fillRect(192 + Math.random() * 64, 64 + Math.random() * 64, 2, 2);
     }
     
     const texture = new THREE.CanvasTexture(canvas);
@@ -133,7 +135,6 @@
   
   const texture = createTexture();
   
-  // Three.js setup
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87ceeb);
   scene.fog = new THREE.Fog(0x87ceeb, 150, 300);
@@ -147,15 +148,25 @@
   renderer.shadowMap.enabled = false;
   document.body.appendChild(renderer.domElement);
   
-  // Lighting
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(100, 100, 100);
-  scene.add(light);
-  
-  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+  // More realistic lighting: hemisphere + directional sun light
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+  hemi.position.set(0, 200, 0);
+  scene.add(hemi);
+
+  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+  sun.position.set(100, 100, 100);
+  sun.castShadow = false; // keep shadows off by default for performance
+  scene.add(sun);
+
+  // Day/night cycle state (0..1 where 0 = midnight, 0.5 = noon)
+  let timeOfDay = 0.6; // start near daytime
+  const daySpeed = 0.0005; // speed of cycle
+  const dayColor = new THREE.Color(0x87ceeb);
+  const nightColor = new THREE.Color(0x0a0a2a);
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.12);
   scene.add(ambient);
   
-  // Player
   const player = {
     pos: new THREE.Vector3(8, 20, 8),
     vel: new THREE.Vector3(0, 0, 0),
@@ -164,13 +175,14 @@
     gravity: 0.015,
     isGrounded: false,
     selectedBlock: 'grass',
-    inventory: { grass: 64, dirt: 64, stone: 32, wood: 32, sand: 32, water: 32, leaves: 16 },
+    health: 20,
+    hunger: 20,
+    miningProgress: {},
+    inventory: { grass: 32, dirt: 32, stone: 16, wood: 16, sand: 16, leaves: 8, coal: 4, iron: 2, planks: 0, sticks: 0 },
   };
   
   const keys = {};
   const raycaster = new THREE.Raycaster();
-  
-  // World
   const chunks = new Map();
   const blocks = new Map();
   
@@ -185,7 +197,6 @@
         const worldZ = chunkZ * CHUNK_SIZE + z;
         const height = terrain[x][z];
         
-        // 15% chance for tree
         if(Math.random() < 0.15 && height > 30 && height < 35) {
           const trunkHeight = 5;
           for(let y = height; y < height + trunkHeight; y++) {
@@ -193,7 +204,6 @@
             blocks.set(key, 'wood');
           }
           
-          // Leaves
           const foliageStart = height + trunkHeight - 2;
           const foliageRadius = 3;
           for(let fy = foliageStart; fy < foliageStart + 4; fy++) {
@@ -219,7 +229,6 @@
         const worldX = chunkX * CHUNK_SIZE + x;
         const worldZ = chunkZ * CHUNK_SIZE + z;
         
-        // Improved Perlin-like noise for terrain
         const n1 = perlin(worldX * 0.05, worldZ * 0.05) * 10;
         const n2 = perlin(worldX * 0.1, worldZ * 0.1) * 5;
         const height = Math.floor(28 + n1 + n2);
@@ -227,8 +236,10 @@
         
         for(let y = 0; y < WORLD_HEIGHT; y++){
           let blockType = 'air';
-          if(y < height - 2) blockType = 'stone';
-          else if(y < height - 1) blockType = 'dirt';
+          if(y < height - 4) blockType = 'stone';
+          else if(y < height - 2) {
+            blockType = Math.random() < 0.1 ? 'coal' : 'stone';
+          } else if(y < height - 1) blockType = 'dirt';
           else if(y < height) blockType = 'grass';
           else if(y < height + 1 && height < 27) blockType = 'sand';
           
@@ -242,21 +253,36 @@
     generateTrees(chunkX, chunkZ, terrain);
   }
   
-  // Reuse geometry and materials
   const geometryCache = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
   const materialCache = {};
   
   function getMaterial(blockType) {
     if(!materialCache[blockType]) {
       if(blockType === 'air') return null;
-      // Simple UV mapping for texture atlas
-      const uvMap = {
-        grass: 0, dirt: 1, stone: 2, wood: 3, sand: 4, water: 5, leaves: 6
-      };
-      const material = new THREE.MeshLambertMaterial({ 
-        color: BLOCKS[blockType].color,
-        map: texture
+      // Use a PBR-like material for better visuals but keep it cheap
+      const baseColor = new THREE.Color(BLOCKS[blockType].color);
+      const material = new THREE.MeshStandardMaterial({
+        color: baseColor,
+        roughness: blockType === 'stone' || blockType === 'coal' || blockType === 'iron' ? 0.7 : 0.9,
+        metalness: blockType === 'iron' ? 0.2 : 0.0,
+        map: texture,
+        flatShading: false,
       });
+
+      // Slightly tweak leaves and water
+      if(blockType === 'leaves'){
+        material.roughness = 0.8;
+        material.transparent = true;
+        material.opacity = 0.95;
+      }
+      if(blockType === 'water'){
+        material.roughness = 0.25;
+        material.metalness = 0.0;
+        material.transparent = true;
+        material.opacity = 0.7;
+        material.color = new THREE.Color(0x3da6ff);
+      }
+
       materialCache[blockType] = material;
     }
     return materialCache[blockType];
@@ -300,7 +326,6 @@
     chunks.set(key, group);
   }
   
-  // Load initial chunks
   for(let cx = -1; cx <= 1; cx++){
     for(let cz = -1; cz <= 1; cz++){
       loadChunk(cx, cz);
@@ -318,11 +343,13 @@
     }
     
     const num = parseInt(e.key);
-    if(num >= 1 && num <= 7){
-      const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'sand', 'water', 'leaves'];
+    if(num >= 1 && num <= 9){
+      const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'sand', 'water', 'leaves', 'coal', 'iron'];
       player.selectedBlock = blockTypes[num - 1];
       updateHotbar();
     }
+    
+    if(e.key === 'c') openCraftingMenu();
   });
   
   document.addEventListener('keyup', (e) => {
@@ -367,12 +394,17 @@
             
             const mesh = createBlockMesh(newX, newY, newZ, player.selectedBlock);
             if(mesh) scene.add(mesh);
+            updateHUD();
           }
         } else if(e.button === 2){
           const key = getBlockKey(x, y, z);
-          blocks.delete(key);
-          player.inventory[blockType] = (player.inventory[blockType] || 0) + 1;
-          scene.remove(hit.object);
+          if(blocks.has(key)){
+            blocks.delete(key);
+            const blockType = blocks.get(key);
+            player.inventory[blockType] = (player.inventory[blockType] || 0) + 1;
+            scene.remove(hit.object);
+            updateHUD();
+          }
         }
       }
     }
@@ -384,10 +416,24 @@
     document.querySelectorAll('.hotbar-slot').forEach(slot => {
       slot.classList.remove('selected');
     });
-    const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'sand', 'water', 'leaves'];
+    const blockTypes = ['grass', 'dirt', 'stone', 'wood', 'sand', 'water', 'leaves', 'coal', 'iron'];
     const idx = blockTypes.indexOf(player.selectedBlock) + 1;
     const elem = document.getElementById('block-' + idx);
     if(elem) elem.classList.add('selected');
+  }
+  
+  function updateHUD() {
+    const health = document.getElementById('health-value');
+    const hunger = document.getElementById('hunger-value');
+    if(health) health.textContent = player.health;
+    if(hunger) hunger.textContent = player.hunger;
+  }
+  
+  function openCraftingMenu() {
+    const menu = document.getElementById('crafting-menu');
+    if(menu) {
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
   }
   
   const btn = document.getElementById('startBtn');
@@ -400,8 +446,47 @@
       renderer.domElement.requestPointerLock();
     });
   }
+
+    // Crafting button handlers
+    document.querySelectorAll('.craft-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const recipeKey = btn.getAttribute('data-recipe');
+        const recipe = RECIPES[recipeKey];
+        if(!recipe) return;
+        // check ingredients
+        let ok = true;
+        for(const [k,v] of Object.entries(recipe.input)){
+          if((player.inventory[k] || 0) < v) { ok = false; break; }
+        }
+        if(!ok) return;
+        // consume
+        for(const [k,v] of Object.entries(recipe.input)){
+          player.inventory[k] -= v;
+        }
+        for(const [k,v] of Object.entries(recipe.output)){
+          player.inventory[k] = (player.inventory[k] || 0) + v;
+        }
+        updateHUD();
+      });
+    });
   
   function update(){
+    // advance day/night cycle
+    timeOfDay += daySpeed;
+    if(timeOfDay > 1) timeOfDay -= 1;
+    const angle = timeOfDay * Math.PI * 2; // rotate over 0..2pi
+    const sunY = Math.sin(angle);
+    const sunX = Math.cos(angle);
+    sun.position.set(sunX * 100, sunY * 100, Math.sin(angle * 0.5) * 50);
+    // intensity and color transition
+    const intensity = Math.max(0.15, sunY);
+    sun.intensity = intensity;
+    hemi.intensity = 0.3 * Math.max(0.1, sunY + 0.2);
+    ambient.intensity = 0.08 + (0.12 * Math.max(0, sunY));
+    // blend sky color
+    scene.background = dayColor.clone().lerp(nightColor, 1 - Math.max(0, sunY));
+    scene.fog.color.copy(scene.background);
+
     const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
     const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
     
@@ -410,24 +495,51 @@
     if(keys['a']) player.pos.addScaledVector(right, -player.speed);
     if(keys['d']) player.pos.addScaledVector(right, player.speed);
     
+    // Hunger decay
+    if(Math.random() < 0.001) {
+      player.hunger = Math.max(0, player.hunger - 0.1);
+      if(player.hunger === 0 && Math.random() < 0.01) {
+        player.health = Math.max(0, player.health - 0.5);
+      }
+    }
+    
     player.vel.y -= player.gravity;
     player.pos.y += player.vel.y;
     
-    // Better collision: check blocks below player
+    // Better collision detection
     const belowKey = getBlockKey(Math.floor(player.pos.x), Math.floor(player.pos.y - 0.1), Math.floor(player.pos.z));
-    const currentKey = getBlockKey(Math.floor(player.pos.x), Math.floor(player.pos.y), Math.floor(player.pos.z));
-    
     if(blocks.has(belowKey) && player.vel.y <= 0){
       player.pos.y = Math.floor(player.pos.y) + 1;
       player.vel.y = 0;
       player.isGrounded = true;
-    } else if(!blocks.has(currentKey)){
+    } else {
       player.isGrounded = false;
     }
     
-    if(player.pos.y < 0) player.pos.set(8, 20, 8);
+    // Prevent walking through blocks
+    for(let dx = -1; dx <= 1; dx++) {
+      for(let dz = -1; dz <= 1; dz++) {
+        const checkKey = getBlockKey(Math.floor(player.pos.x + dx * 0.3), Math.floor(player.pos.y), Math.floor(player.pos.z + dz * 0.3));
+        if(blocks.has(checkKey)) {
+          player.pos.x -= player.vel.x > 0 ? 0.1 : player.vel.x < 0 ? -0.1 : 0;
+          player.pos.z -= player.vel.z > 0 ? 0.1 : player.vel.z < 0 ? -0.1 : 0;
+        }
+      }
+    }
+    
+    if(player.pos.y < 0) {
+      player.health -= 5;
+      player.pos.set(8, 20, 8);
+    }
+    
+    if(player.health <= 0) {
+      player.health = 20;
+      player.hunger = 20;
+      player.pos.set(8, 20, 8);
+    }
     
     camera.position.copy(player.pos);
+    updateHUD();
   }
   
   function animate(){

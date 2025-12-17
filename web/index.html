@@ -1,31 +1,50 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Minecraft 3D</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Minecraft Survival</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
   <div id="overlay">
-    <h1>Minecraft 3D</h1>
-    <p>Click <strong>Start</strong> to enter fullscreen and play.</p>
-    <p style="font-size: 12px;">WASD = Move | Space = Jump | Mouse = Look Around<br/>Left Click = Place Block | Right Click = Break Block | 1-6 = Select Block</p>
-    <button id="startBtn">Start</button>
-  </div>
-  <div id="hud">
-    <div id="hotbar">
-      <div id="block-1" class="hotbar-slot selected" data-block="grass">Grass</div>
-      <div id="block-2" class="hotbar-slot" data-block="dirt">Dirt</div>
-      <div id="block-3" class="hotbar-slot" data-block="stone">Stone</div>
-      <div id="block-4" class="hotbar-slot" data-block="wood">Wood</div>
-      <div id="block-5" class="hotbar-slot" data-block="sand">Sand</div>
-      <div id="block-6" class="hotbar-slot" data-block="water">Water</div>
-      <div id="block-7" class="hotbar-slot" data-block="leaves">Leaves</div>
+    <h1>Minecraft Survival</h1>
+    <p>First-person mining & building game</p>
+    <button id="startBtn">Start Game</button>
+    <div style="margin-top:20px; font-size:14px; color:#aaa;">
+      <p>Controls:</p>
+      <p>WASD - Move | Mouse - Look | Space - Jump</p>
+      <p>1-9 - Select Block | Left Click - Place | Right Click - Break</p>
+      <p>C - Crafting Menu</p>
     </div>
-    <div id="crosshair">+</div>
   </div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <div id="hud" style="display:none;">
+    <div id="health-bar" class="hud-bar">❤️ <span id="health-value">20</span>/20</div>
+    <div id="hunger-bar" class="hud-bar">🍖 <span id="hunger-value">20</span>/20</div>
+    
+    <div id="hotbar">
+      <div class="hotbar-slot" id="block-1" title="Grass">🟩</div>
+      <div class="hotbar-slot" id="block-2" title="Dirt">🟫</div>
+      <div class="hotbar-slot" id="block-3" title="Stone">⬜</div>
+      <div class="hotbar-slot" id="block-4" title="Wood">🪵</div>
+      <div class="hotbar-slot" id="block-5" title="Sand">🟨</div>
+      <div class="hotbar-slot" id="block-6" title="Water">🟦</div>
+      <div class="hotbar-slot" id="block-7" title="Leaves">🌿</div>
+      <div class="hotbar-slot" id="block-8" title="Coal">⚫</div>
+      <div class="hotbar-slot" id="block-9" title="Iron">⚪</div>
+    </div>
+    
+    <div id="crafting-menu" style="display:none; position:absolute; bottom:120px; right:20px; background:#222; border:2px solid #888; padding:10px; border-radius:5px; max-width:200px; max-height:300px; overflow-y:auto;">
+      <h3 style="margin-top:0; color:#fff;">Crafting</h3>
+      <button class="craft-btn" data-recipe="wood->planks">Wood → Planks (4)</button>
+      <button class="craft-btn" data-recipe="planks->sticks">Planks → Sticks (4)</button>
+      <button class="craft-btn" data-recipe="planks->crafting">Planks → Crafting Table</button>
+      <button class="craft-btn" data-recipe="sticks->torches">Sticks+Coal → Torches (4)</button>
+    </div>
+    
+    <div id="crosshair" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:20px; height:20px; border:2px solid white; border-radius:50%;"></div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
