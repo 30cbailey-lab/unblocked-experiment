@@ -41,68 +41,87 @@
     return ix0 + v * (ix1 - ix0);
   }
   
-  // Create canvas-based texture
+  // Create canvas-based texture (improved Minecraft-style)
   function createTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
     
-    // Grass block
-    ctx.fillStyle = '#2d5016';
-    ctx.fillRect(0, 0, 64, 64);
-    ctx.strokeStyle = '#1a3d0a';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(0, 0, 64, 64);
-    for(let i = 0; i < 8; i++) {
-      ctx.fillStyle = 'rgba(255,255,255,0.1)';
-      ctx.fillRect(i * 8, i * 8, 4, 4);
+    // Grass block (top + side)
+    ctx.fillStyle = '#5eba1a';
+    ctx.fillRect(0, 0, 64, 32);
+    ctx.fillStyle = '#3d7b13';
+    ctx.fillRect(0, 32, 64, 32);
+    // Grass detail
+    for(let i = 0; i < 16; i++) {
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.fillRect(Math.random() * 64, Math.random() * 32, 2, 2);
     }
     
     // Dirt block
-    ctx.fillStyle = '#8B4513';
+    ctx.fillStyle = '#8B6F47';
     ctx.fillRect(64, 0, 64, 64);
-    ctx.strokeStyle = '#5a2e0a';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(64, 0, 64, 64);
-    
-    // Stone block
-    ctx.fillStyle = '#808080';
-    ctx.fillRect(128, 0, 64, 64);
-    ctx.fillStyle = 'rgba(100,100,100,0.5)';
-    for(let i = 0; i < 20; i++) {
-      ctx.fillRect(128 + Math.random() * 64, Math.random() * 64, 3, 3);
-    }
-    
-    // Wood block
-    ctx.fillStyle = '#654321';
-    ctx.fillRect(192, 0, 64, 64);
-    ctx.strokeStyle = '#3d2817';
-    for(let i = 0; i < 5; i++) {
-      ctx.strokeRect(192, 0 + i * 13, 64, 2);
-    }
-    
-    // Sand block
-    ctx.fillStyle = '#f4d03f';
-    ctx.fillRect(0, 64, 64, 64);
-    ctx.fillStyle = 'rgba(200,180,0,0.3)';
     for(let i = 0; i < 30; i++) {
+      ctx.fillStyle = 'rgba(139, 111, 71, 0.5)';
+      ctx.fillRect(64 + Math.random() * 64, Math.random() * 64, 3, 3);
+    }
+    
+    // Stone block (rocky texture)
+    ctx.fillStyle = '#707070';
+    ctx.fillRect(128, 0, 64, 64);
+    for(let i = 0; i < 40; i++) {
+      ctx.fillStyle = i % 2 === 0 ? '#505050' : '#909090';
+      ctx.fillRect(128 + Math.random() * 64, Math.random() * 64, 2, 2);
+    }
+    // Cracks
+    ctx.strokeStyle = '#404040';
+    ctx.lineWidth = 1;
+    for(let i = 0; i < 8; i++) {
+      ctx.beginPath();
+      ctx.moveTo(128 + Math.random() * 64, Math.random() * 64);
+      ctx.lineTo(128 + Math.random() * 64, Math.random() * 64);
+      ctx.stroke();
+    }
+    
+    // Wood block (log rings)
+    ctx.fillStyle = '#8B5A2B';
+    ctx.fillRect(192, 0, 64, 64);
+    ctx.strokeStyle = '#654321';
+    ctx.lineWidth = 2;
+    for(let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.arc(192 + 32, 32, 20 - i * 3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    
+    // Sand block (grain texture)
+    ctx.fillStyle = '#DEB887';
+    ctx.fillRect(0, 64, 64, 64);
+    for(let i = 0; i < 50; i++) {
+      ctx.fillStyle = 'rgba(200, 180, 100, 0.6)';
       ctx.fillRect(Math.random() * 64, 64 + Math.random() * 64, 2, 2);
     }
     
-    // Water block
-    ctx.fillStyle = '#4287f5';
+    // Water block (wavy pattern)
+    ctx.fillStyle = '#1E90FF';
     ctx.fillRect(64, 64, 64, 64);
-    ctx.strokeStyle = '#2a5aa5';
-    for(let i = 0; i < 4; i++) {
-      ctx.strokeRect(64 + i * 16, 64 + i * 16, 64 - i * 32, 64 - i * 32);
+    ctx.strokeStyle = '#4169E1';
+    ctx.lineWidth = 1;
+    for(let y = 64; y < 128; y += 8) {
+      ctx.beginPath();
+      ctx.moveTo(64, y);
+      for(let x = 64; x < 128; x += 4) {
+        ctx.lineTo(x, y + Math.sin(x / 8) * 2);
+      }
+      ctx.stroke();
     }
     
-    // Leaves block
-    ctx.fillStyle = '#228B22';
+    // Leaves block (dense green with variation)
+    ctx.fillStyle = '#2D8A2D';
     ctx.fillRect(128, 64, 64, 64);
-    ctx.fillStyle = 'rgba(0,255,0,0.2)';
-    for(let i = 0; i < 40; i++) {
+    for(let i = 0; i < 60; i++) {
+      ctx.fillStyle = i % 3 === 0 ? '#228B22' : '#3CB371';
       ctx.fillRect(128 + Math.random() * 64, 64 + Math.random() * 64, 3, 3);
     }
     
@@ -394,12 +413,15 @@
     player.vel.y -= player.gravity;
     player.pos.y += player.vel.y;
     
-    const checkX = getBlockKey(Math.floor(player.pos.x), Math.floor(player.pos.y), Math.floor(player.pos.z));
-    if(blocks.has(checkX)){
-      player.pos.y = Math.floor(player.pos.y) + 2;
+    // Better collision: check blocks below player
+    const belowKey = getBlockKey(Math.floor(player.pos.x), Math.floor(player.pos.y - 0.1), Math.floor(player.pos.z));
+    const currentKey = getBlockKey(Math.floor(player.pos.x), Math.floor(player.pos.y), Math.floor(player.pos.z));
+    
+    if(blocks.has(belowKey) && player.vel.y <= 0){
+      player.pos.y = Math.floor(player.pos.y) + 1;
       player.vel.y = 0;
       player.isGrounded = true;
-    } else {
+    } else if(!blocks.has(currentKey)){
       player.isGrounded = false;
     }
     
