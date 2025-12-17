@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Minecraft 3D</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="overlay">
+    <h1>Minecraft 3D</h1>
+    <p>Click <strong>Start</strong> to enter fullscreen and play.</p>
+    <p style="font-size: 12px;">WASD = Move | Space = Jump | Mouse = Look Around<br/>Left Click = Place Block | Right Click = Break Block | 1-6 = Select Block</p>
+    <button id="startBtn">Start</button>
+  </div>
+  <div id="hud">
+    <div id="hotbar">
+      <div id="block-1" class="hotbar-slot selected" data-block="grass">Grass</div>
+      <div id="block-2" class="hotbar-slot" data-block="dirt">Dirt</div>
+      <div id="block-3" class="hotbar-slot" data-block="stone">Stone</div>
+      <div id="block-4" class="hotbar-slot" data-block="wood">Wood</div>
+      <div id="block-5" class="hotbar-slot" data-block="sand">Sand</div>
+      <div id="block-6" class="hotbar-slot" data-block="water">Water</div>
+    </div>
+    <div id="crosshair">+</div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
