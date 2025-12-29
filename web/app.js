@@ -49,6 +49,19 @@
     
     return ix0 + v * (ix1 - ix0);
   }
+
+  function generateHeight(x, z) {
+    // Large-scale mountain/valley variation
+    const mountain = perlin(x * 0.02, z * 0.02) * 20;
+    // Medium-scale rolling hills
+    const hills = perlin(x * 0.08, z * 0.08) * 8;
+    // Small-scale detail
+    const detail = perlin(x * 0.15, z * 0.15) * 3;
+    
+    let baseHeight = 28 + mountain + hills + detail;
+    // Clamp between min and max
+    return Math.max(5, Math.min(35, Math.floor(baseHeight)));
+  }
   
   function createTexture() {
     const canvas = document.createElement('canvas');
@@ -185,6 +198,9 @@
   const raycaster = new THREE.Raycaster();
   const chunks = new Map();
   const blocks = new Map();
+  
+  // Track if game is started
+  let gameStarted = false;
 
   const NON_SOLID = new Set(['air','water','leaves']);
 
@@ -229,19 +245,36 @@
         const worldZ = chunkZ * CHUNK_SIZE + z;
         const height = terrain[x][z];
         
-        if(Math.random() < 0.15 && height > 30 && height < 35) {
-          const trunkHeight = 5;
+        // Trees on grassy areas (heights 28-34)
+        if(Math.random() < 0.08 && height > 27 && height < 34) {
+          const trunkHeight = 6 + Math.floor(Math.random() * 3); // 6-8 blocks tall
+          
+          // Trunk
           for(let y = height; y < height + trunkHeight; y++) {
             const key = getBlockKey(worldX, y, worldZ);
             blocks.set(key, 'wood');
           }
           
-          const foliageStart = height + trunkHeight - 2;
-          const foliageRadius = 3;
-          for(let fy = foliageStart; fy < foliageStart + 4; fy++) {
-            for(let fx = -foliageRadius; fx <= foliageRadius; fx++) {
-              for(let fz = -foliageRadius; fz <= foliageRadius; fz++) {
-                if(Math.abs(fx) + Math.abs(fz) <= foliageRadius) {
+          // Foliage - larger and more Minecraft-like
+          const foliageStart = height + trunkHeight - 3;
+          
+          // Base of crown
+          for(let fy = foliageStart; fy < foliageStart + 2; fy++) {
+            for(let fx = -3; fx <= 3; fx++) {
+              for(let fz = -3; fz <= 3; fz++) {
+                if(Math.abs(fx) + Math.abs(fz) <= 3) {
+                  const key = getBlockKey(worldX + fx, fy, worldZ + fz);
+                  if(!blocks.has(key)) blocks.set(key, 'leaves');
+                }
+              }
+            }
+          }
+          
+          // Top of crown (narrower)
+          for(let fy = foliageStart + 2; fy < foliageStart + 4; fy++) {
+            for(let fx = -2; fx <= 2; fx++) {
+              for(let fz = -2; fz <= 2; fz++) {
+                if(Math.abs(fx) + Math.abs(fz) <= 2) {
                   const key = getBlockKey(worldX + fx, fy, worldZ + fz);
                   if(!blocks.has(key)) blocks.set(key, 'leaves');
                 }
@@ -261,19 +294,31 @@
         const worldX = chunkX * CHUNK_SIZE + x;
         const worldZ = chunkZ * CHUNK_SIZE + z;
         
-        const n1 = perlin(worldX * 0.05, worldZ * 0.05) * 10;
-        const n2 = perlin(worldX * 0.1, worldZ * 0.1) * 5;
-        const height = Math.floor(28 + n1 + n2);
+        const height = generateHeight(worldX, worldZ);
         terrain[x][z] = height;
+        
+        // Determine biome
+        const biomeMoisture = perlin(worldX * 0.05, worldZ * 0.05);
+        const isBeach = height <= 26 && height >= 24;
+        const isDesert = biomeMoisture < 0.3 && height > 26 && height < 34;
         
         for(let y = 0; y < WORLD_HEIGHT; y++){
           let blockType = 'air';
-          if(y < height - 4) blockType = 'stone';
-          else if(y < height - 2) {
-            blockType = Math.random() < 0.1 ? 'coal' : 'stone';
-          } else if(y < height - 1) blockType = 'dirt';
-          else if(y < height) blockType = 'grass';
-          else if(y < height + 1 && height < 27) blockType = 'sand';
+          const depthFromTop = height - y;
+          
+          if(y < height - 4) {
+            blockType = 'stone';
+          } else if(y < height - 2) {
+            blockType = Math.random() < 0.12 ? 'coal' : 'stone';
+          } else if(y < height - 1) {
+            blockType = 'dirt';
+          } else if(y < height) {
+            if(isBeach) blockType = 'sand';
+            else if(isDesert) blockType = 'sand';
+            else blockType = 'grass';
+          } else if(y === height && height < 25) {
+            blockType = 'sand'; // water edge
+          }
           
           if(blockType !== 'air'){
             const key = getBlockKey(worldX, y, worldZ);
@@ -475,6 +520,7 @@
       const hud = document.getElementById('hud');
       if(overlay) overlay.style.display = 'none';
       if(hud) hud.style.display = 'block';
+      gameStarted = true;
       renderer.domElement.requestPointerLock();
     });
   }
@@ -503,33 +549,35 @@
     });
   
   function update(){
+    if(!gameStarted) return;
+    
     // advance day/night cycle
     timeOfDay += daySpeed;
     if(timeOfDay > 1) timeOfDay -= 1;
-    const angle = timeOfDay * Math.PI * 2; // rotate over 0..2pi
+    const angle = timeOfDay * Math.PI * 2;
     const sunY = Math.sin(angle);
     const sunX = Math.cos(angle);
     sun.position.set(sunX * 100, sunY * 100, Math.sin(angle * 0.5) * 50);
-    // intensity and color transition
     const intensity = Math.max(0.15, sunY);
     sun.intensity = intensity;
     hemi.intensity = 0.3 * Math.max(0.1, sunY + 0.2);
     ambient.intensity = 0.08 + (0.12 * Math.max(0, sunY));
-    // blend sky color
     scene.background = dayColor.clone().lerp(nightColor, 1 - Math.max(0, sunY));
     scene.fog.color.copy(scene.background);
 
-    // movement as velocity, then AABB collision
+    // Camera-relative movement
     const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
     const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, camera.rotation.y, 0));
 
-    // horizontal velocity
+    // Reset horizontal velocity
     player.vel.x = 0;
     player.vel.z = 0;
-    if(keys['w']) { player.vel.addScaledVector(forward, player.speed); }
-    if(keys['s']) { player.vel.addScaledVector(forward, -player.speed); }
-    if(keys['a']) { player.vel.addScaledVector(right, -player.speed); }
-    if(keys['d']) { player.vel.addScaledVector(right, player.speed); }
+    
+    // Apply movement from pressed keys
+    if(keys['w'] || keys['W']) { player.vel.addScaledVector(forward, player.speed); }
+    if(keys['s'] || keys['S']) { player.vel.addScaledVector(forward, -player.speed); }
+    if(keys['a'] || keys['A']) { player.vel.addScaledVector(right, -player.speed); }
+    if(keys['d'] || keys['D']) { player.vel.addScaledVector(right, player.speed); }
 
     // Hunger decay
     if(Math.random() < 0.001) {
@@ -539,14 +587,13 @@
       }
     }
 
-    // apply gravity
+    // Apply gravity
     player.vel.y -= player.gravity;
 
-    // Prepare AABB params
     const halfWidth = 0.3;
     const height = 1.8;
 
-    // X axis
+    // X axis collision
     const tryX = player.pos.x + player.vel.x;
     if(!aabbIntersects(tryX, player.pos.y, player.pos.z, halfWidth, height)){
       player.pos.x = tryX;
@@ -554,7 +601,7 @@
       player.vel.x = 0;
     }
 
-    // Z axis
+    // Z axis collision
     const tryZ = player.pos.z + player.vel.z;
     if(!aabbIntersects(player.pos.x, player.pos.y, tryZ, halfWidth, height)){
       player.pos.z = tryZ;
@@ -562,17 +609,17 @@
       player.vel.z = 0;
     }
 
-    // Y axis (vertical: handle ground and ceilings)
+    // Y axis collision
     const tryY = player.pos.y + player.vel.y;
     if(player.vel.y <= 0){
-      // falling - check if will hit ground
       if(aabbIntersects(player.pos.x, tryY, player.pos.z, halfWidth, height)){
-        // snap to block top
         const footY = Math.floor(player.pos.y - 0.01);
-        // find highest solid block under player
         let landY = -Infinity;
         for(let yy = footY; yy >= 0; yy--){
-          if(isSolidBlockAt(Math.floor(player.pos.x), yy, Math.floor(player.pos.z))){ landY = yy; break; }
+          if(isSolidBlockAt(Math.floor(player.pos.x), yy, Math.floor(player.pos.z))){ 
+            landY = yy; 
+            break; 
+          }
         }
         if(landY !== -Infinity){
           player.pos.y = landY + 1;
@@ -586,7 +633,6 @@
         player.isGrounded = false;
       }
     } else {
-      // moving up - stop at ceiling
       if(aabbIntersects(player.pos.x, tryY, player.pos.z, halfWidth, height)){
         player.vel.y = 0;
       } else {
