@@ -51,16 +51,10 @@
   }
 
   function generateHeight(x, z) {
-    // Large-scale mountain/valley variation
-    const mountain = perlin(x * 0.02, z * 0.02) * 20;
-    // Medium-scale rolling hills
-    const hills = perlin(x * 0.08, z * 0.08) * 8;
-    // Small-scale detail
-    const detail = perlin(x * 0.15, z * 0.15) * 3;
-    
-    let baseHeight = 28 + mountain + hills + detail;
-    // Clamp between min and max
-    return Math.max(5, Math.min(35, Math.floor(baseHeight)));
+    // Simple Minecraft-like terrain: rolling hills
+    const hills = perlin(x * 0.05, z * 0.05) * 6;
+    const detail = perlin(x * 0.1, z * 0.1) * 2;
+    return Math.floor(26 + hills + detail);
   }
   
   function createTexture() {
@@ -245,9 +239,9 @@
         const worldZ = chunkZ * CHUNK_SIZE + z;
         const height = terrain[x][z];
         
-        // Trees on grassy areas (heights 28-34)
-        if(Math.random() < 0.08 && height > 27 && height < 34) {
-          const trunkHeight = 6 + Math.floor(Math.random() * 3); // 6-8 blocks tall
+        // Sparse tree generation on grass areas
+        if(Math.random() < 0.06 && height > 20) {
+          const trunkHeight = 5;
           
           // Trunk
           for(let y = height; y < height + trunkHeight; y++) {
@@ -255,23 +249,9 @@
             blocks.set(key, 'wood');
           }
           
-          // Foliage - larger and more Minecraft-like
-          const foliageStart = height + trunkHeight - 3;
-          
-          // Base of crown
-          for(let fy = foliageStart; fy < foliageStart + 2; fy++) {
-            for(let fx = -3; fx <= 3; fx++) {
-              for(let fz = -3; fz <= 3; fz++) {
-                if(Math.abs(fx) + Math.abs(fz) <= 3) {
-                  const key = getBlockKey(worldX + fx, fy, worldZ + fz);
-                  if(!blocks.has(key)) blocks.set(key, 'leaves');
-                }
-              }
-            }
-          }
-          
-          // Top of crown (narrower)
-          for(let fy = foliageStart + 2; fy < foliageStart + 4; fy++) {
+          // Foliage
+          const foliageStart = height + trunkHeight - 2;
+          for(let fy = foliageStart; fy < foliageStart + 3; fy++) {
             for(let fx = -2; fx <= 2; fx++) {
               for(let fz = -2; fz <= 2; fz++) {
                 if(Math.abs(fx) + Math.abs(fz) <= 2) {
@@ -295,29 +275,20 @@
         const worldZ = chunkZ * CHUNK_SIZE + z;
         
         const height = generateHeight(worldX, worldZ);
-        terrain[x][z] = height;
-        
-        // Determine biome
-        const biomeMoisture = perlin(worldX * 0.05, worldZ * 0.05);
-        const isBeach = height <= 26 && height >= 24;
-        const isDesert = biomeMoisture < 0.3 && height > 26 && height < 34;
+        terrain[x][z] = Math.max(5, Math.min(31, height)); // Clamp to world bounds
         
         for(let y = 0; y < WORLD_HEIGHT; y++){
           let blockType = 'air';
-          const depthFromTop = height - y;
+          const groundLevel = terrain[x][z];
           
-          if(y < height - 4) {
+          if(y < groundLevel - 4) {
             blockType = 'stone';
-          } else if(y < height - 2) {
-            blockType = Math.random() < 0.12 ? 'coal' : 'stone';
-          } else if(y < height - 1) {
+          } else if(y < groundLevel - 1) {
+            blockType = Math.random() < 0.15 ? 'coal' : 'stone';
+          } else if(y < groundLevel) {
             blockType = 'dirt';
-          } else if(y < height) {
-            if(isBeach) blockType = 'sand';
-            else if(isDesert) blockType = 'sand';
-            else blockType = 'grass';
-          } else if(y === height && height < 25) {
-            blockType = 'sand'; // water edge
+          } else if(y === groundLevel) {
+            blockType = 'grass';
           }
           
           if(blockType !== 'air'){
@@ -549,8 +520,6 @@
     });
   
   function update(){
-    if(!gameStarted) return;
-    
     // advance day/night cycle
     timeOfDay += daySpeed;
     if(timeOfDay > 1) timeOfDay -= 1;
